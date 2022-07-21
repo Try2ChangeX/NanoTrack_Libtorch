@@ -44,8 +44,8 @@ void track(NanoTrack *siam_tracker, const char *video_path)
     // Select a rect.
     cv::namedWindow("demo"); 
     // cv::Rect trackWindow = cv::selectROI("demo", frame); // 手动选择
-    // cv::Rect trackWindow =cv::Rect(244,161,74,70);         // 固定值 ,girl_dance
-    cv::Rect trackWindow =cv::Rect(280,472,70,47);         // 固定值 ,fire
+    cv::Rect trackWindow =cv::Rect(244,161,74,70);         // 固定值 ,girl_dance
+    // cv::Rect trackWindow =cv::Rect(280,472,70,47);         // 固定值 ,fire
 
     // Initialize tracker with first frame and rect.
     State state; 
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
 
     // Get video path                    
     //const char* video_path = argv[1];
-    const char* video_path = "../data/videos/fire_s0118.mp4"; 
+    const char* video_path = "../data/videos/girl_dance.mp4"; 
     
     // Build tracker 
     NanoTrack *siam_tracker; 
