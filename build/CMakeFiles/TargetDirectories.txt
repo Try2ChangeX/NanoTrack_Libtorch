@@ -1,3 +1,0 @@
-/home/calyx/c_projects/NanoTrack_Libtorch/build/CMakeFiles/NanoTrack_Libtorch.dir
-/home/calyx/c_projects/NanoTrack_Libtorch/build/CMakeFiles/edit_cache.dir
-/home/calyx/c_projects/NanoTrack_Libtorch/build/CMakeFiles/rebuild_cache.dir
