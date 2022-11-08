@@ -12,12 +12,11 @@ void cxy_wh_2_rect(const cv::Point& pos, const cv::Point2f& sz, cv::Rect &rect)
 {
     rect.x = max(0, pos.x - int(sz.x / 2));
     rect.y = max(0, pos.y - int(sz.y / 2));
-    rect.width = int(sz.x);   
-    rect.height = int(sz.y);  
+    rect.width = int(sz.x); 
+    rect.height = int(sz.y); 
 }
 
 void track(NanoTrack *siam_tracker, const char *video_path)
-
 {
     // Read video
     cv::VideoCapture capture; 
@@ -43,8 +42,8 @@ void track(NanoTrack *siam_tracker, const char *video_path)
     
     // Select a rect.
     cv::namedWindow("demo"); 
-    // cv::Rect trackWindow = cv::selectROI("demo", frame); // 手动选择
-    cv::Rect trackWindow =cv::Rect(244,161,74,70);         // 固定值 ,girl_dance
+    cv::Rect trackWindow = cv::selectROI("demo", frame); // 手动选择
+    // cv::Rect trackWindow =cv::Rect(244,161,74,70);         // 固定值 ,girl_dance
     // cv::Rect trackWindow =cv::Rect(280,472,70,47);         // 固定值 ,fire
 
     // Initialize tracker with first frame and rect.
@@ -113,13 +112,13 @@ int main(int argc, char** argv)
 
     // Get model path.
 
-    std::string T_backbone_model = "../models/nanotrack_backbone_T127.pt";
-    std::string X_backbone_model = "../models/nanotrack_backbone_X255.pt";
-    std::string head_model = "../models/head.pt"; // 
+    std::string T_backbone_model = "./models/nanotrack_backbone_T127.pt";
+    std::string X_backbone_model = "./models/nanotrack_backbone_X255.pt";
+    std::string head_model = "./models/head.pt"; 
 
     // Get video path                    
     //const char* video_path = argv[1];
-    const char* video_path = "../data/videos/girl_dance.mp4"; 
+    const char* video_path = "./data/videos/fire_s0118.mp4"; 
     
     // Build tracker 
     NanoTrack *siam_tracker; 
@@ -131,3 +130,4 @@ int main(int argc, char** argv)
 
     return 0;
 }
+ 

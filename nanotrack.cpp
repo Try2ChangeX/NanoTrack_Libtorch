@@ -3,6 +3,8 @@
 #include <string>
 #include "nanotrack.hpp"
 
+using namespace std;
+
 inline float fast_exp(float x)
 {
     union {
@@ -87,10 +89,14 @@ void NanoTrack::init(cv::Mat img, cv::Rect bbox)
     cv::Point target_pos; // cx, cy
     cv::Point2f target_sz = {0.f, 0.f}; //w,h
 
-    target_pos.x = bbox.x + bbox.width / 2;  
-    target_pos.y = bbox.y + bbox.height / 2; 
+    target_pos.x = bbox.x + bbox.width / 2; 
+    target_pos.y = bbox.y + bbox.height / 2;
     target_sz.x=bbox.width;
     target_sz.y=bbox.height;
+
+    cout<<"bbox"<<bbox<<endl;
+    cout<<"target_pos"<<target_pos<<endl;
+    cout<<"target_sz"<<target_sz<<endl;
     
     float wc_z = target_sz.x + cfg.context_amount * (target_sz.x + target_sz.y);
     float hc_z = target_sz.y + cfg.context_amount * (target_sz.x + target_sz.y);
@@ -101,21 +107,25 @@ void NanoTrack::init(cv::Mat img, cv::Rect bbox)
     
     z_crop  = get_subwindow_tracking(img, target_pos, cfg.exemplar_size, int(s_z),avg_chans); //cv::Mat BGR order 
 
+    // cout<<"z_crop"<<z_crop<<endl;
 
     // 数据输入以及模板初始化
     //转tensor
     torch::Tensor tensor_image_T = torch::from_blob(z_crop.data, {1,z_crop.rows, z_crop.cols,3}, torch::kByte);
+
     tensor_image_T = tensor_image_T.permute({0,3,1,2});
     tensor_image_T = tensor_image_T.toType(torch::kFloat);
 
+    cout<<"tensor_image_T"<<tensor_image_T<<endl;
     result_T = module_T127.forward({tensor_image_T}).toTensor();
 
+    cout<<"result_T"<<result_T<<endl;
     
     this->state.channel_ave=avg_chans;
     this->state.im_h=img.rows;
     this->state.im_w=img.cols;
     this->state.target_pos=target_pos;
-    this->state.target_sz= target_sz;  
+    this->state.target_sz= target_sz; 
 }
 
 void NanoTrack::update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2f &target_sz,  float scale_z, float &cls_score_max)
@@ -132,15 +142,15 @@ void NanoTrack::update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2
     // std::cout << "==========================" << std::endl;
     // std::cout << "result_T shape is:"<<result_T.sizes() << std::endl; 
     // std::cout << "result_X shape is:"<<result_X.sizes() << std::endl; 
-
+    
     // 多数入
     std::vector<torch::jit::IValue> inputs;
     inputs.push_back(result_T);
     inputs.push_back(result_X);
 
-    // torch::Tensor result = net_head.forward(inputs).toTensor();
-    torch::Tensor cls_score = net_head.forward(inputs).toTuple()->elements()[0].toTensor();
-    torch::Tensor bbox_pred = net_head.forward(inputs).toTuple()->elements()[1].toTensor();
+    auto result = net_head.forward(inputs).toTuple();
+    torch::Tensor cls_score = result->elements()[0].toTensor();
+    torch::Tensor bbox_pred = result->elements()[1].toTensor();
     // std::cout << "输出的shape:"<< cls_score.sizes() << std::endl;
     // std::cout << "输出的shape:"<< bbox_pred.sizes() << std::endl;
 
@@ -151,26 +161,34 @@ void NanoTrack::update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2
     // std::cout << "输出的shape:"<< cls_score_result.sizes() << std::endl;
     // std::cout << "输出的shape:"<< bbox_pred_result.sizes() << std::endl;
 
-    
+    // std::cout<<cls_score_result<<endl;
+
     std::vector<float> cls_score_sigmoid; 
     
     // float* cls_score_data = (float*)cls_score.data; 
     // float* cls_score_data = cls_score.channel(1); 
 
-    cv::Mat cls_score_mat(cv::Size{16, 16}, CV_32F, cls_score_result.index({1,"..."}).data_ptr());
+    // cv::Mat cls_score_mat(cv::Size{16, 16}, CV_32F, cls_score_result.index({1,"..."}).data_ptr());
+    // float* cls_score_data = (float*) cls_score_mat.data;
 
-    float* cls_score_data = (float*) cls_score_mat.data;
+    /* @20220805，问题：cls_score_result数据范围是[-1,1],而mat的CV_32F为[0,1]， 会有精度截断, 改了还是不对*/
+
+    float* cls_score_data = (float*) cls_score_result.index({1,"..."}).data_ptr();
+
+    /* debug */
+    // for(int i=0;i<256; i++){
+    //     cout<<cls_score_data[i]<<endl;
+    // }
 
     // std::cout << "cls_score_data:"<< cls_score_mat << std::endl;
 
     // torch::Tensor tensor_tmp = cls_score_result.index({1,"..."});
-    // std::cout << "tensor_tmp:"<< tensor_tmp << std::endl;
+    // std::cout << "tensor_tmp:"<< cls_score_result.index({1,"..."}) << std::endl;
 
-    cls_score_sigmoid.clear();  
+    cls_score_sigmoid.clear();
 
-    int cols = cls_score.sizes()[2];  
-    int rows = cls_score.sizes()[3];   
-
+    int cols = cls_score.sizes()[2]; 
+    int rows = cls_score.sizes()[3]; 
 
     for (int i = 0; i < cols*rows; i++)   //
     {        
@@ -179,21 +197,20 @@ void NanoTrack::update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2
 
     std::vector<float> pred_x1(cols*rows, 0), pred_y1(cols*rows, 0), pred_x2(cols*rows, 0), pred_y2(cols*rows, 0);
 
-    cv::Mat bbox_pred_mat1(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({0,"..."}).data_ptr());
-    cv::Mat bbox_pred_mat2(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({1,"..."}).data_ptr());
-    cv::Mat bbox_pred_mat3(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({2,"..."}).data_ptr());
-    cv::Mat bbox_pred_mat4(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({3,"..."}).data_ptr());
+    // cv::Mat bbox_pred_mat1(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({0,"..."}).data_ptr());
+    // cv::Mat bbox_pred_mat2(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({1,"..."}).data_ptr());
+    // cv::Mat bbox_pred_mat3(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({2,"..."}).data_ptr());
+    // cv::Mat bbox_pred_mat4(cv::Size{16, 16}, CV_32F, bbox_pred_result.index({3,"..."}).data_ptr());
 
-    float* bbox_pred_data1 = (float*) bbox_pred_mat1.data;
-    float* bbox_pred_data2 = (float*) bbox_pred_mat2.data;
-    float* bbox_pred_data3 = (float*) bbox_pred_mat3.data;
-    float* bbox_pred_data4 = (float*) bbox_pred_mat4.data;
+    float* bbox_pred_data1 = (float*) bbox_pred_result.index({0,"..."}).data_ptr();
+    float* bbox_pred_data2 = (float*) bbox_pred_result.index({1,"..."}).data_ptr();
+    float* bbox_pred_data3 = (float*) bbox_pred_result.index({2,"..."}).data_ptr();
+    float* bbox_pred_data4 = (float*) bbox_pred_result.index({3,"..."}).data_ptr();
     
     for (int i=0; i<rows; i++)
     {
         for (int j=0; j<cols; j++)
         {
-
             pred_x1[i*cols + j] = this->grid_to_search_x[i*cols + j] - bbox_pred_data1[i*cols + j];
             pred_y1[i*cols + j] = this->grid_to_search_y[i*cols + j] - bbox_pred_data2[i*cols + j];
             pred_x2[i*cols + j] = this->grid_to_search_x[i*cols + j] + bbox_pred_data3[i*cols + j];
@@ -277,12 +294,10 @@ void NanoTrack::update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2
     target_sz.y = target_sz.y * (1 - lr) + lr * res_h;
 
     cls_score_max = cls_score_sigmoid[r_max * cols + c_max];
-    
 }
 
-void NanoTrack::track(cv::Mat im) 
+void NanoTrack::track(cv::Mat im)
 {
-    
     cv::Point target_pos = this->state.target_pos;
     cv::Point2f target_sz = this->state.target_sz;
     
@@ -294,6 +309,9 @@ void NanoTrack::track(cv::Mat im)
     float d_search = (cfg.instance_size - cfg.exemplar_size) / 2; 
     float pad = d_search / scale_z; 
     float s_x = s_z + 2*pad;
+
+    /* add @20220808 to with python */
+    // float s_x = s_z * (cfg.instance_size / cfg.exemplar_size);
 
     cv::Mat x_crop;  
     x_crop  = get_subwindow_tracking(im, target_pos, cfg.instance_size, int(s_x),state.channel_ave);
@@ -322,14 +340,13 @@ void NanoTrack::load_model(std::string T_model_backbone, std::string X_model_bac
     this->module_T127 = torch::jit::load(T_model_backbone);
     this->module_X255 = torch::jit::load(X_model_backbone);
     this->net_head = torch::jit::load(model_head);
-
 }
 
 // 生成每一个格点的坐标 
 void NanoTrack::create_window()
 {
-    int score_size= cfg.score_size; 
-    std::vector<float> hanning(score_size,0);  
+    int score_size= cfg.score_size;
+    std::vector<float> hanning(score_size,0);
     this->window.resize(score_size*score_size, 0);
 
     for (int i = 0; i < score_size; i++)

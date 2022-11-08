@@ -1,6 +1,6 @@
 # NanoTrack 
 
-libtorch版本的NanoTrack跟踪算法，纯C++编写
+libtorch版本部署的NanoTrack跟踪算法，纯C++编写
 
 该项目主要参考[Android $ MacOS version](https://github.com/HonglinChu/NanoTrack),
 

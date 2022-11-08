@@ -8,10 +8,8 @@
 #include <opencv2/highgui/highgui.hpp> 
 #include <opencv2/imgproc/imgproc.hpp> 
 
-
 #include <torch/torch.h>
 #include <torch/script.h>
-
 
 #define PI 3.1415926 
 
@@ -53,17 +51,15 @@ public:
     void init(cv::Mat img, cv::Rect bbox);
     
     void update(const cv::Mat &x_crops, cv::Point &target_pos, cv::Point2f &target_sz, float scale_z, float &cls_score_max);
-    
+        
     void track(cv::Mat im);
     
     void load_model(std::string T_backbone_model, std::string X_backbone_model, std::string model_head);
-
 
     // add by xwd @20220720
 
     torch::jit::script::Module module_T127, module_X255, net_head;
     torch::Tensor result_T, result_X;
-
 
     int stride=16;
     
